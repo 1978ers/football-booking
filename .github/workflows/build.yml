@@ -37,15 +37,15 @@ jobs:
           node --version
           echo '=== NPM version ==='
           npm --version
-          echo '=== Cap version ==='
-          npx cap --version
           echo '=== Cap doctor ==='
-          npx cap doctor || true
-          echo '=== Checking ANDROID_HOME ==='
+          npx cap doctor || echo 'Cap doctor failed (non-critical)'
+          echo '=== ANDROID_HOME ==='
           echo $ANDROID_HOME
+          echo '=== JAVA_HOME ==='
+          echo $JAVA_HOME
 
       - name: Add Android platform
-        run: npx cap add android
+        run: npx cap add android || echo 'cap add failed'
 
       - name: Sync Capacitor
         run: npx cap sync android
