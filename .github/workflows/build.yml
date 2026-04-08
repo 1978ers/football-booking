@@ -31,6 +31,18 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK components
+        run: |
+          export ANDROID_HOME=${ANDROID_HOME:-$HOME/android-sdk}
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls $ANDROID_HOME 2>/dev/null || echo "SDK not found"
+          if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
+            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+            $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>&1 || echo "SDK install failed"
+          fi
+          echo "=== SDK contents ==="
+          ls $ANDROID_HOME/
+
       - name: Debug Capacitor
         run: |
           echo '=== Node version ==='
