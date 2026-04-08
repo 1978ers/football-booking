@@ -31,6 +31,19 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Debug Capacitor
+        run: |
+          echo '=== Node version ==='
+          node --version
+          echo '=== NPM version ==='
+          npm --version
+          echo '=== Cap version ==='
+          npx cap --version
+          echo '=== Cap doctor ==='
+          npx cap doctor || true
+          echo '=== Checking ANDROID_HOME ==='
+          echo $ANDROID_HOME
+
       - name: Add Android platform
         run: npx cap add android
 
