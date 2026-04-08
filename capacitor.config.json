@@ -1,6 +1,6 @@
 {
   "appId": "com.football.booking",
-  "appName": "足球约球",
+  "appName": "FootballBooking",
   "webDir": "www",
   "server": {
     "androidScheme": "https"
