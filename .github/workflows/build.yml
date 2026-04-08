@@ -48,7 +48,12 @@ jobs:
         run: npx cap add android || echo 'cap add failed'
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          echo '=== Syncing Capacitor ==='
+          npx cap sync android
+          echo '=== Sync exit code: $? ==='
+          echo '=== Android folder ==='
+          ls -la android/ || echo 'No android folder'
 
       - name: Build APK
         run: |
