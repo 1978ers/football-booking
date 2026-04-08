@@ -56,8 +56,8 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          export GRADLE_OPTS="-Xmx2048m -Dorg.gradle.daemon=false"
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -100
+          export GRADLE_OPTS="-Xmx2048m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+          ./gradlew assembleDebug --no-daemon --no-parallel 2>&1 | tail -100
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
