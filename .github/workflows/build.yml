@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -73,16 +73,17 @@ jobs:
           export ANDROID_HOME=${ANDROID_HOME:-$HOME/android-sdk}
           export JAVA_HOME=${JAVA_HOME}
           ./gradlew assembleDebug > ../gradle-build.log 2>&1
-          tail -200 ../gradle-build.log
-          echo "=== EXIT CODE: $? ==="
-          exit 1
+          EXIT_CODE=$?
+          tail -200 ../gradle-build.log 2>/dev/null || echo "No log file"
+          echo "=== EXIT CODE: $EXIT_CODE ==="
+          exit $EXIT_CODE
 
       - name: Upload Gradle logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: gradle-logs
-          path: gradle-build.log
+          path: ..gradle-build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
