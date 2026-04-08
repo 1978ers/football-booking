@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>足球约球</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#2e7d32;--green-light:#4caf50;--green-bg:#e8f5e9;--text:#1a1a1a;--text2:#555;--border:#ddd;--white:#fff}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif;background:#f5f5f5;color:var(--text);max-width:480px;margin:0 auto;min-height:100vh}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
+.loading-overlay .spinner{width:36px;height:36px;border:3px solid var(--green-bg);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+.loading-overlay p{margin-top:14px;color:var(--text2);font-size:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+header{background:var(--green);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+header h1{font-size:18px;font-weight:600}
+header .user-info{font-size:13px;opacity:0.9}
+
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--border);display:flex;z-index:100}
+.tab-btn{flex:1;padding:10px 0;border:none;background:#fff;color:var(--text2);font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.tab-btn.active{color:var(--green)}
+.tab-icon{font-size:20px}
+
+.page{display:none;padding:16px;padding-bottom:80px}
+.page.active{display:block}
+
+.card{background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-title{font-size:16px;font-weight:600;color:var(--text)}
+.card-tag{background:var(--green-bg);color:var(--green);font-size:11px;padding:2px 8px;border-radius:10px}
+.card-meta{font-size:13px;color:var(--text2);line-height:1.7}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0}
+.card-num{font-size:13px;color:var(--green);font-weight:600}
+.join-btn{background:var(--green);color:#fff;border:none;padding:6px 18px;border-radius:20px;font-size:13px;cursor:pointer}
+.join-btn:disabled{background:#ccc;cursor:not-allowed}
+
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--green)}
+.form-group textarea{resize:vertical;min-height:80px}
+.btn-submit{width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:16px;cursor:pointer}
+
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
+.filter-chip{padding:5px 14px;border-radius:20px;font-size:13px;white-space:nowrap;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--text2)}
+.filter-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+.empty{text-align:center;padding:50px 0;color:var(--text2)}
+.empty-icon{font-size:48px;margin-bottom:10px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:360px}
+.modal h3{font-size:17px;margin-bottom:16px;text-align:center}
+.modal input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;margin-bottom:12px}
+.modal-btns{display:flex;gap:10px}
+.modal-btns button{flex:1;padding:10px;border-radius:8px;font-size:14px;cursor:pointer;border:none}
+.modal-btns .cancel{background:#f0f0f0;color:var(--text)}
+.modal-btns .confirm{background:var(--green);color:#fff}
+
+.player-list{margin-top:10px}
+.player-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid #f5f5f5}
+.player-item:last-child{border-bottom:none}
+.player-name{font-weight:500}
+.player-time{color:var(--text2);font-size:12px}
+.remove-btn{color:#e53935;font-size:12px;cursor:pointer;border:none;background:none}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:300;display:none}
+.toast.show{display:block}
+
+.detail-header{background:var(--green);color:#fff;padding:16px;border-radius:10px;margin-bottom:14px}
+.detail-title{font-size:20px;font-weight:600;margin-bottom:10px}
+.detail-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px}
+.detail-section{background:#fff;border-radius:10px;padding:14px;margin-bottom:12px}
+.detail-section h4{font-size:14px;color:var(--text2);margin-bottom:10px}
+.detail-actions{display:flex;gap:10px;margin-top:14px}
+.detail-actions button{flex:1;padding:12px;border-radius:8px;font-size:15px;cursor:pointer;border:none}
+.detail-actions .btn-post{background:var(--green);color:#fff}
+.detail-actions .btn-delete{background:#fff;color:#e53935;border:1px solid #e53935}
+.back-btn{background:none;border:none;color:#fff;font-size:16px;cursor:pointer}
+.my-game-tag{font-size:11px;background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:8px}
+.page-title{font-size:17px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.page-title .icon{font-size:20px}
+.offline-hint{background:#fff3e0;color:#e65100;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p id="loadingText">正在连接云端...</p>
+</div>
+
+<header>
+  <button class="back-btn" id="backBtn" style="display:none">← 返回</button>
+  <h1>⚽ 足球约球</h1>
+  <span class="user-info" id="headerUser"></span>
+</header>
+
+<div class="page active" id="pageHome">
+  <div class="page-title"><span class="icon">🏃</span>发现球局</div>
+  <div id="offlineHint" class="offline-hint" style="display:none">🌐 当前离线模式</div>
+  <div class="filter-bar" id="filterBar">
+    <span class="filter-chip active" data-filter="all">全部</span>
+    <span class="filter-chip" data-filter="today">今天</span>
+    <span class="filter-chip" data-filter="tomorrow">明天</span>
+    <span class="filter-chip" data-filter="week">本周</span>
+  </div>
+  <div id="gameList"></div>
+</div>
+
+<div class="page" id="pagePost">
+  <div class="page-title"><span class="icon">📝</span>发布球局</div>
+  <div class="form-group"><label>球局标题 *</label><input type="text" id="postTitle" placeholder="如：周六下午野球局" maxlength="50"></div>
+  <div class="form-group"><label>日期 *</label><input type="date" id="postDate"></div>
+  <div class="form-group"><label>时间 *</label><input type="time" id="postTime"></div>
+  <div class="form-group"><label>场地名称 *</label><input type="text" id="postPlace" placeholder="如：市民足球公园" maxlength="30"></div>
+  <div class="form-group"><label>详细地址 *</label><input type="text" id="postAddress" placeholder="如：海淀区西三旗建材城西路" maxlength="80"></div>
+  <div class="form-group"><label>人数上限 *</label>
+    <select id="postMax">
+      <option value="6">6人（3v3）</option><option value="8">8人（4v4）</option>
+      <option value="10" selected>10人（5v5）</option><option value="14">14人（7v7）</option>
+      <option value="22">22人（11v11）</option>
+    </select>
+  </div>
+  <div class="form-group"><label>费用</label>
+    <select id="postFee"><option value="免费">免费</option><option value="AA">AA制</option><option value="我请">我请</option></select>
+  </div>
+  <div class="form-group"><label>备注</label><textarea id="postNote" placeholder="装备要求、联系方式等（选填）" maxlength="200"></textarea></div>
+  <button class="btn-submit" id="postSubmitBtn" onclick="postGame()">发布球局</button>
+</div>
+
+<div class="page" id="pageDetail"><div id="detailContent"></div></div>
+<div class="page" id="pageMyPost"><div class="page-title"><span class="icon">📤</span>我的发球</div><div id="myPostList"></div></div>
+<div class="page" id="pageMyJoin"><div class="page-title"><span class="icon">✅</span>已报名</div><div id="myJoinList"></div></div>
+
+<nav>
+  <button class="tab-btn active" data-page="pageHome"><span class="tab-icon">🏃</span>发现</button>
+  <button class="tab-btn" data-page="pagePost"><span class="tab-icon">➕</span>发球</button>
+  <button class="tab-btn" data-page="pageMyPost"><span class="tab-icon">📤</span>我的</button>
+  <button class="tab-btn" data-page="pageMyJoin"><span class="tab-icon">✅</span>报名</button>
+</nav>
+
+<div class="modal-overlay" id="joinModal">
+  <div class="modal">
+    <h3>报名球局</h3>
+    <input type="text" id="joinName" placeholder="请输入昵称" maxlength="20">
+    <input type="tel" id="joinPhone" placeholder="手机号（选填）" maxlength="20">
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeJoinModal()">取消</button>
+      <button class="confirm" onclick="confirmJoin()">确认报名</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://img.sdk.cloudbase.cn/sdk/2.13.2/cloudbase.js"></script>
+<script>
+// ========== 云端配置 ==========
+const TCB_ENV_ID = 'football-1gjtctvt8c583ba2';
+const TCB_SECRET_ID = "";
+const TCB_SECRET_KEY = "";
+const COLLECTION = 'football_games';
+
+let db, app, isOnline = false;
+let allGames = [];
+
+// ========== 初始化 ==========
+async function initCloudBase() {
+  try {
+    app = cloudbase.init({
+      env: TCB_ENV_ID,
+      
+      secretKey: TCB_SECRET_KEY
+    });
+    db = app.database();
+    isOnline = true;
+    document.getElementById('offlineHint').style.display = 'none';
+  } catch(e) {
+    console.warn('CloudBase init failed:', e);
+    isOnline = false;
+    document.getElementById('offlineHint').style.display = 'block';
+  }
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// ========== 工具函数 ==========
+function escapeHtml(str){
+  if(!str)return'';
+  return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+function formatDate(d){
+  const dt=new Date(d+'T00:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  const tom=new Date(today);tom.setDate(tom.getDate()+1);
+  if(dt<today)return'已过期';
+  if(dt.getTime()===today.getTime())return'今天';
+  if(dt.getTime()===tom.getTime())return'明天';
+  return`${dt.getMonth()+1}月${dt.getDate()}日`;
+}
+function formatDateFull(d){
+  const dt=new Date(d+'T00:00:00');
+  return`${dt.getMonth()+1}月${dt.getDate()}日`;
+}
+function isExpired(dateStr,timeStr){
+  if(!dateStr||!timeStr)return false;
+  const dt=new Date(`${dateStr}T${timeStr}:00`);
+  return dt<=new Date();
+}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).substr(2,9)}
+function getMyName(){return localStorage.getItem('fb_my_name')||''}
+function saveMyName(n){localStorage.setItem('fb_my_name',n)}
+function getId(g){return g._id||g.id||g._openid||''}
+
+// ========== 云端数据 ==========
+async function getCloudGames(){
+  if(!isOnline||!db)return[];
+  try{
+    const res=await db.collection(COLLECTION).orderBy('createdAt','desc').get();
+    return res.data||[];
+  }catch(e){console.warn('Cloud query failed:',e);return[];}
+}
+async function addCloudGame(game){
+  if(!isOnline||!db)return null;
+  try{
+    const res=await db.collection(COLLECTION).add({data:{...game,createdAt:Date.now()}});
+    return res.id;
+  }catch(e){console.warn('Cloud add failed:',e);return null;}
+}
+async function updateCloudGame(id,updates){
+  if(!isOnline||!db)return false;
+  try{await db.collection(COLLECTION).doc(id).update(updates);return true;}catch(e){console.warn(e);return false;}
+}
+async function deleteCloudGame(id){
+  if(!isOnline||!db)return false;
+  try{await db.collection(COLLECTION).doc(id).remove();return true;}catch(e){console.warn(e);return false;}
+}
+
+// ========== 页面切换 ==========
+let currentPage='pageHome',currentView='list',currentDetailId=null,currentFilter='all',pendingJoinId=null;
+
+function showPage(pageId){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===pageId));
+  currentPage=pageId;
+  document.getElementById('backBtn').style.display='none';
+  if(pageId==='pageHome'&&currentView==='detail')currentView='list';
+  renderPage(pageId);
+}
+function showDetail(id){
+  currentDetailId=id;currentView='detail';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pageDetail').classList.add('active');
+  document.getElementById('backBtn').style.display='block';
+  renderDetail(id);
+}
+document.getElementById('backBtn').addEventListener('click',()=>{currentView='list';showPage('pageHome');});
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const p=btn.dataset.page;
+    if(p==='pagePost'){ensureMyName();setDefaultDate();}
+    showPage(p);
+  });
+});
+
+// ========== 渲染 ==========
+async function renderPage(pageId){
+  if(pageId==='pageHome')await renderGameList();
+  if(pageId==='pageMyPost')await renderMyPost();
+  if(pageId==='pageMyJoin')await renderMyJoin();
+  document.getElementById('headerUser').textContent=getMyName()?'👤'+escapeHtml(getMyName()):'';
+}
+async function renderGameList(){
+  allGames=await getCloudGames();
+  const myName=getMyName();
+  const today=new Date();today.setHours(0,0,0,0);
+  let games=allGames.filter(g=>!isExpired(g.date,g.time));
+  if(currentFilter==='today')games=games.filter(g=>new Date(g.date+'T00:00:00').getTime()===today.getTime());
+  else if(currentFilter==='tomorrow'){const tom=new Date(today);tom.setDate(tom.getDate()+1);games=games.filter(g=>new Date(g.date+'T00:00:00').getTime()===tom.getTime());}
+  else if(currentFilter==='week'){const wE=new Date(today);wE.setDate(wE.getDate()+7);games=games.filter(g=>{const d=new Date(g.date+'T00:00:00');return d>=today&&d<=wE;});}
+  const c=document.getElementById('gameList');
+  if(games.length===0){c.innerHTML='<div class="empty"><div class="empty-icon">⚽</div><div>暂没有球局，去发一个吧</div></div>';return;}
+  games.sort((a,b)=>new Date(a.date+'T'+a.time)-new Date(b.date+'T'+b.time));
+  c.innerHTML=games.map(g=>{
+    const ps=g.players||[];
+    const full=ps.length>=g.max;
+    const exp=isExpired(g.date,g.time);
+    const canJoin=!full&&!exp;
+    const iJoined=ps.some(p=>p.name===myName);
+    let btn='报名';
+    if(iJoined)btn='已报名';else if(full)btn='已满';else if(exp)btn='已结束';
+    return`<div class="card" onclick="showDetail('${getId(g)}')">
+      <div class="card-header"><div class="card-title">${escapeHtml(g.title)}</div><span class="card-tag">${formatDate(g.date)}</span></div>
+      <div class="card-meta"><div>🕐 ${g.time}　📍 ${escapeHtml(g.place)}</div><div>💰 ${escapeHtml(g.fee)}　👥 ${ps.length}/${g.max}人</div></div>
+      <div class="card-footer"><span class="card-num">${full?'已满':'还剩'+((g.max||10)-ps.length)+'个名额'}</span>
+        <button class="join-btn" ${!canJoin&&!iJoined?'disabled':''} onclick="event.stopPropagation();openJoinModal('${getId(g)}')">${btn}</button>
+      </div></div>`;
+  }).join('');
+}
+async function renderDetail(id){
+  const g=allGames.find(x=>getId(x)===id);
+  if(!g){showPage('pageHome');return;}
+  const myName=getMyName(),ps=g.players||[];
+  const mine=g.creatorName===myName;
+  const iJoined=ps.some(p=>p.name===myName);
+  const full=ps.length>=g.max,exp=isExpired(g.date,g.time);
+  const canJoin=!full&&!exp&&!iJoined&&!mine;
+  document.getElementById('detailContent').innerHTML=`
+    <div class="detail-header">
+      <div class="detail-title">${escapeHtml(g.title)}</div>
+      <div class="detail-row">🗓 ${formatDateFull(g.date)} ${g.time}</div>
+      <div class="detail-row">📍 ${escapeHtml(g.place)} - ${escapeHtml(g.address)}</div>
+      <div class="detail-row">👥 ${ps.length}/${g.max}人${g.fee&&g.fee!=='免费'?' · '+escapeHtml(g.fee):''}</div>
+    </div>
+    <div class="detail-section"><h4>📋 报名列表</h4>
+      ${ps.length===0?'<div style="color:var(--text2);font-size:13px;text-align:center;padding:10px 0">暂没有人报名</div>':''}
+      <div class="player-list">${ps.map(p=>`<div class="player-item">
+        <span class="player-name">⚽ ${escapeHtml(p.name)}</span>
+        <div><span class="player-time">${p.phone?'📞'+escapeHtml(p.phone):''}</span>
+        ${mine||p.name===myName?'<button class="remove-btn" onclick="removePlayer(\''+getId(g)+'\',\''+p.name+'\')">移除</button>':''}</div>
+      </div>`).join('')}</div></div>
+    ${g.note?`<div class="detail-section"><h4>📝 备注</h4><div style="font-size:14px;line-height:1.7">${escapeHtml(g.note)}</div></div>`:''}
+    <div class="detail-section"><h4>📱 发布者</h4><div style="font-size:14px">${escapeHtml(g.creatorName)} · ${formatDateFull(g.createdDate||g.date)}</div></div>
+    <div class="detail-actions">
+      ${mine?`<button class="btn-delete" onclick="deleteGame('${getId(g)}')">删除</button>`:''}
+      ${canJoin?`<button class="btn-post" onclick="openJoinModal('${getId(g)}')">我要报名</button>`:''}
+      ${iJoined&&!mine?`<button class="btn-delete" onclick="cancelJoin('${getId(g)}')">取消报名</button>`:''}
+      ${exp&&!mine?'<button class="btn-delete" disabled>已结束</button>':''}
+      ${full&&!iJoined&&!mine?'<button class="btn-delete" disabled>已满</button>':''}
+    </div>`;
+}
+async function renderMyPost(){
+  const myName=getMyName();
+  if(!myName){document.getElementById('myPostList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先设置昵称</div></div>';return;}
+  const gs=allGames.filter(g=>g.creatorName===myName);
+  const c=document.getElementById('myPostList');
+  if(gs.length===0){c.innerHTML='<div class="empty"><div class="empty-icon">⚽</div><div>你还没发过球局</div></div>';return;}
+  c.innerHTML=gs.map(g=>{const ps=g.players||[];const exp=isExpired(g.date,g.time);return`<div class="card" onclick="showDetail('${getId(g)}')">
+    <div class="card-header"><div class="card-title">${escapeHtml(g.title)}</div><span class="${exp?'card-tag':'my-game-tag'}">${exp?'已过期':formatDate(g.date)}</span></div>
+    <div class="card-meta"><div>🕐 ${g.time}　📍 ${escapeHtml(g.place)}</div><div>👥 ${ps.length}/${g.max}人报名</div></div></div>`;}).join('');
+}
+async function renderMyJoin(){
+  const myName=getMyName();
+  if(!myName){document.getElementById('myJoinList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先设置昵称</div></div>';return;}
+  const gs=allGames.filter(g=>(g.players||[]).some(p=>p.name===myName));
+  const c=document.getElementById('myJoinList');
+  if(gs.length===0){c.innerHTML='<div class="empty"><div class="empty-icon">⚽</div><div>你还没报名任何球局</div></div>';return;}
+  c.innerHTML=gs.map(g=>{const exp=isExpired(g.date,g.time);return`<div class="card" onclick="showDetail('${getId(g)}')">
+    <div class="card-header"><div class="card-title">${escapeHtml(g.title)}</div><span class="${exp?'card-tag':'my-game-tag'}">${exp?'已结束':'已报名'}</span></div>
+    <div class="card-meta"><div>🕐 ${g.time}　📍 ${escapeHtml(g.place)}</div><div>${formatDateFull(g.date)}</div></div></div>`;}).join('');
+}
+
+// ========== 发球 ==========
+function setDefaultDate(){
+  const d=new Date().toISOString().split('T')[0];
+  document.getElementById('postDate').value=d;
+  document.getElementById('postTime').value='10:00';
+}
+function ensureMyName(){let n=getMyName();if(!n){n=prompt('请输入你的昵称：')||'';if(n){saveMyName(n);}else{toast('需要昵称才能发球');return false;}}return true;}
+async function postGame(){
+  if(!ensureMyName())return;
+  const btn=document.getElementById('postSubmitBtn');
+  btn.disabled=true;btn.textContent='发布中...';
+  const title=document.getElementById('postTitle').value.trim();
+  const date=document.getElementById('postDate').value;
+  const time=document.getElementById('postTime').value;
+  const place=document.getElementById('postPlace').value.trim();
+  const address=document.getElementById('postAddress').value.trim();
+  const max=parseInt(document.getElementById('postMax').value);
+  const fee=document.getElementById('postFee').value;
+  const note=document.getElementById('postNote').value.trim();
+  if(!title||!date||!time||!place||!address){toast('请填写必填项');btn.disabled=false;btn.textContent='发布球局';return;}
+  const newGame={title,date,time,place,address,max,fee:fee||'免费',note,creatorName:getMyName(),createdDate:new Date().toISOString().split('T')[0],players:[]};
+  await addCloudGame(newGame);
+  document.getElementById('postTitle').value='';document.getElementById('postPlace').value='';document.getElementById('postAddress').value='';document.getElementById('postNote').value='';
+  btn.disabled=false;btn.textContent='发布球局';
+  toast('发布成功！');
+  showPage('pageHome');
+}
+
+// ========== 报名 ==========
+function openJoinModal(id){
+  let name=getMyName();
+  if(!name){name=prompt('请输入你的昵称：')||'';if(!name){toast('需要昵称才能报名');return;}saveMyName(name);document.getElementById('headerUser').textContent='👤'+name;}
+  pendingJoinId=id;
+  document.getElementById('joinName').value=name;
+  document.getElementById('joinPhone').value='';
+  document.getElementById('joinModal').classList.add('show');
+  document.getElementById('joinName').focus();
+}
+function closeJoinModal(){document.getElementById('joinModal').classList.remove('show');pendingJoinId=null;}
+async function confirmJoin(){
+  const name=document.getElementById('joinName').value.trim();
+  const phone=document.getElementById('joinPhone').value.trim();
+  if(!name){toast('请输入昵称');return;}
+  if(!pendingJoinId)return;
+  saveMyName(name);
+  const g=allGames.find(x=>getId(x)===pendingJoinId);
+  if(!g){toast('球局不存在');return;}
+  if(!g.players)g.players=[];
+  if(g.players.length>=g.max){toast('已满员');return;}
+  if(g.players.some(p=>p.name===name)){toast('你已报名');return;}
+  g.players.push({name,phone,joinTime:new Date().toLocaleString('zh-CN')});
+  await updateCloudGame(pendingJoinId,{players:g.players});
+  closeJoinModal();toast('报名成功！');
+  await renderPage(currentPage);
+  if(currentPage==='pageDetail')await renderDetail(pendingJoinId);
+}
+async function cancelJoin(id){
+  const myName=getMyName();if(!myName)return;
+  const g=allGames.find(x=>getId(x)===id);if(!g)return;
+  g.players=(g.players||[]).filter(p=>p.name!==myName);
+  await updateCloudGame(id,{players:g.players});
+  toast('已取消报名');await renderPage(currentPage);
+}
+async function removePlayer(gameId,playerName){
+  const g=allGames.find(x=>getId(x)===gameId);if(!g)return;
+  g.players=(g.players||[]).filter(p=>p.name!==playerName);
+  await updateCloudGame(gameId,{players:g.players});
+  await renderDetail(gameId);toast('已移除');
+}
+
+// ========== 删除 ==========
+async function deleteGame(id){if(!confirm('确定删除？'))return;await deleteCloudGame(id);toast('已删除');showPage('pageMyPost');}
+
+// ========== 筛选 ==========
+document.getElementById('filterBar').addEventListener('click',e=>{
+  if(e.target.classList.contains('filter-chip')){
+    currentFilter=e.target.dataset.filter;
+    document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+    e.target.classList.add('active');
+    renderGameList();
+  }
+});
+
+// ========== 启动 ==========
+(function(){
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('postDate').min=today;
+  initCloudBase().then(()=>renderGameList());
+  const n=getMyName();if(n)document.getElementById('headerUser').textContent='👤'+escapeHtml(n);
+})();
+</script>
+</body>
+</html>
