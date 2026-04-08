@@ -49,15 +49,18 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp -r www/* android/app/src/main/assets/public/ 2>&1 || mkdir -p android/app/src/main/assets/public && cp -r www/* android/app/src/main/assets/public/
+          mkdir -p android/app/src/main/assets/public/
+          cp -r www/* android/app/src/main/assets/public/
           echo '=== Copy exit code: $? ==='
+          ls -la android/app/src/main/assets/public/
 
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          export GRADLE_OPTS="-Xmx2048m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
-          ./gradlew assembleDebug --no-daemon --no-parallel 2>&1 | tail -100
+          export ANDROID_HOME=${ANDROID_HOME:-$HOME/android-sdk}
+          export JAVA_HOME=${JAVA_HOME}
+          ./gradlew assembleDebug --no-daemon 2>&1 | tail -100
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
