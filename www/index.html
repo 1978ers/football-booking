@@ -12,6 +12,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
 .loading-overlay .spinner{width:36px;height:36px;border:3px solid var(--green-bg);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
 .loading-overlay p{margin-top:14px;color:var(--text2);font-size:14px}
+.auth-page{padding:40px 24px;display:flex;flex-direction:column;align-items:center;min-height:calc(100vh - 60px)}
+.auth-logo{font-size:64px;margin-bottom:16px}
+.auth-title{font-size:24px;font-weight:600;color:var(--text);margin-bottom:32px}
+.auth-tabs{display:flex;width:100%;max-width:300px;margin-bottom:24px;background:#eee;border-radius:8px;padding:4px}
+.auth-tab{flex:1;padding:10px;border:none;background:transparent;border-radius:6px;font-size:15px;cursor:pointer;color:#666}
+.auth-tab.active{background:#fff;color:var(--green);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.auth-form{width:100%;max-width:300px;display:flex;flex-direction:column;gap:14px}
+.auth-form input{padding:14px 16px;border:1px solid var(--border);border-radius:8px;font-size:15px;outline:none}
+.auth-form input:focus{border-color:var(--green)}
+.btn-auth{padding:14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:500;cursor:pointer}
+.btn-auth:active{background:#1b5e20}
+.auth-tip{font-size:13px;color:#e53935;margin-top:12px;min-height:18px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 header{background:var(--green);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
@@ -93,10 +105,34 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
   <p id="loadingText">正在连接云端...</p>
 </div>
 
+<div class="auth-page" id="authPage" style="display:none">
+  <div class="auth-logo">⚽</div>
+  <h2 class="auth-title">足球约球</h2>
+  <div class="auth-tabs">
+    <button class="auth-tab active" data-tab="login" id="tabLogin">登录</button>
+    <button class="auth-tab" data-tab="register" id="tabRegister">注册</button>
+  </div>
+  <div class="auth-form" id="loginForm">
+    <input type="tel" id="loginPhone" placeholder="手机号" maxlength="11">
+    <input type="password" id="loginPwd" placeholder="密码" maxlength="20">
+    <button class="btn-auth" onclick="handleLogin()">登录</button>
+  </div>
+  <div class="auth-form" id="registerForm" style="display:none">
+    <input type="tel" id="regPhone" placeholder="手机号" maxlength="11">
+    <input type="text" id="regName" placeholder="昵称（用于显示）" maxlength="20">
+    <input type="password" id="regPwd" placeholder="密码（至少6位）" maxlength="20">
+    <button class="btn-auth" onclick="handleRegister()">注册</button>
+  </div>
+  <p class="auth-tip" id="authTip"></p>
+</div>
+
 <header>
   <button class="back-btn" id="backBtn" style="display:none">← 返回</button>
   <h1>⚽ 足球约球</h1>
-  <span class="user-info" id="headerUser"></span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="user-info" id="headerUser"></span>
+    <button class="btn-logout" id="btnLogout" style="display:none;padding:4px 10px;background:rgba(255,255,255,0.2);border:none;border-radius:4px;color:#fff;font-size:12px;cursor:pointer;" onclick="handleLogout()">退出</button>
+  </div>
 </header>
 
 <div class="page active" id="pageHome">
@@ -161,8 +197,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 <script>
 // ========== 云端配置 ==========
 const TCB_ENV_ID = 'football-1gjtctvt8c583ba2';
-const TCB_SECRET_ID = "";
-const TCB_SECRET_KEY = "";
+const TCB_SECRET_ID = '';
+const TCB_SECRET_KEY = '';
 const COLLECTION = 'football_games';
 
 let db, app, isOnline = false;
@@ -173,18 +209,119 @@ async function initCloudBase() {
   try {
     app = cloudbase.init({
       env: TCB_ENV_ID,
-      
+      secretId: TCB_SECRET_ID,
       secretKey: TCB_SECRET_KEY
     });
     db = app.database();
     isOnline = true;
     document.getElementById('offlineHint').style.display = 'none';
+    await checkAuth();
   } catch(e) {
     console.warn('CloudBase init failed:', e);
     isOnline = false;
     document.getElementById('offlineHint').style.display = 'block';
+    document.getElementById('loadingOverlay').style.display = 'none';
   }
+}
+
+// ========== 用户认证 ==========
+let currentUser = null;
+
+async function checkAuth() {
+  if (!isOnline || !app) {
+    showAuthPage();
+    return;
+  }
+  try {
+    const auth = app.auth();
+    const loginState = await auth.getLoginState();
+    if (loginState) {
+      const userInfo = await auth.getUserInfo();
+      currentUser = { phone: userInfo.phone || localStorage.getItem('fb_phone'), name: localStorage.getItem('fb_name') || userInfo.nickname || '用户' };
+      showMainApp();
+    } else {
+      showAuthPage();
+    }
+  } catch(e) {
+    console.warn('Auth check failed:', e);
+    showAuthPage();
+  }
+}
+
+function showAuthPage() {
   document.getElementById('loadingOverlay').style.display = 'none';
+  document.getElementById('authPage').style.display = 'flex';
+  document.querySelector('header').style.display = 'none';
+  document.querySelector('nav').style.display = 'none';
+  // Tab switch
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      if (tab.dataset.tab === 'login') {
+        document.getElementById('loginForm').style.display = 'flex';
+        document.getElementById('registerForm').style.display = 'none';
+      } else {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'flex';
+      }
+      document.getElementById('authTip').textContent = '';
+    };
+  });
+}
+
+function showMainApp() {
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('loadingOverlay').style.display = 'none';
+  document.querySelector('header').style.display = 'flex';
+  document.querySelector('nav').style.display = 'flex';
+  document.getElementById('headerUser').textContent = '👤' + escapeHtml(currentUser.name);
+  document.getElementById('btnLogout').style.display = 'block';
+  renderGameList();
+}
+
+async function handleLogin() {
+  const phone = document.getElementById('loginPhone').value.trim();
+  const pwd = document.getElementById('loginPwd').value;
+  if (!phone || !pwd) { document.getElementById('authTip').textContent = '请输入手机号和密码'; return; }
+  try {
+    const auth = app.auth();
+    await auth.signInWithPhoneAndPassword(phone, pwd);
+    currentUser = { phone, name: localStorage.getItem('fb_name') || '用户' };
+    showMainApp();
+  } catch(e) {
+    console.warn('Login failed:', e);
+    document.getElementById('authTip').textContent = '登录失败，请检查手机号和密码';
+  }
+}
+
+async function handleRegister() {
+  const phone = document.getElementById('regPhone').value.trim();
+  const name = document.getElementById('regName').value.trim();
+  const pwd = document.getElementById('regPwd').value;
+  if (!phone || !name || !pwd) { document.getElementById('authTip').textContent = '请填写所有字段'; return; }
+  if (pwd.length < 6) { document.getElementById('authTip').textContent = '密码至少6位'; return; }
+  try {
+    const auth = app.auth();
+    await auth.signUpWithPhoneAndPassword(phone, pwd);
+    localStorage.setItem('fb_phone', phone);
+    localStorage.setItem('fb_name', name);
+    currentUser = { phone, name };
+    showMainApp();
+  } catch(e) {
+    console.warn('Register failed:', e);
+    document.getElementById('authTip').textContent = '注册失败，手机号可能已注册';
+  }
+}
+
+function handleLogout() {
+  if (confirm('确定退出登录？')) {
+    app.auth().signOut();
+    currentUser = null;
+    localStorage.removeItem('fb_phone');
+    localStorage.removeItem('fb_name');
+    showAuthPage();
+  }
 }
 
 // ========== 工具函数 ==========
@@ -248,6 +385,7 @@ async function deleteCloudGame(id){
 let currentPage='pageHome',currentView='list',currentDetailId=null,currentFilter='all',pendingJoinId=null;
 
 function showPage(pageId){
+  if(pageId==='pagePost'&&!currentUser){toast('请先登录');showAuthPage();return;}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===pageId));
@@ -277,11 +415,13 @@ async function renderPage(pageId){
   if(pageId==='pageHome')await renderGameList();
   if(pageId==='pageMyPost')await renderMyPost();
   if(pageId==='pageMyJoin')await renderMyJoin();
-  document.getElementById('headerUser').textContent=getMyName()?'👤'+escapeHtml(getMyName()):'';
+  if (currentUser) {
+    document.getElementById('headerUser').textContent='👤'+escapeHtml(currentUser.name);
+  }
 }
 async function renderGameList(){
   allGames=await getCloudGames();
-  const myName=getMyName();
+  const myName=currentUser?currentUser.name:'';
   const today=new Date();today.setHours(0,0,0,0);
   let games=allGames.filter(g=>!isExpired(g.date,g.time));
   if(currentFilter==='today')games=games.filter(g=>new Date(g.date+'T00:00:00').getTime()===today.getTime());
@@ -309,7 +449,7 @@ async function renderGameList(){
 async function renderDetail(id){
   const g=allGames.find(x=>getId(x)===id);
   if(!g){showPage('pageHome');return;}
-  const myName=getMyName(),ps=g.players||[];
+  const myName=currentUser?currentUser.name:'',ps=g.players||[];
   const mine=g.creatorName===myName;
   const iJoined=ps.some(p=>p.name===myName);
   const full=ps.length>=g.max,exp=isExpired(g.date,g.time);
@@ -339,8 +479,8 @@ async function renderDetail(id){
     </div>`;
 }
 async function renderMyPost(){
-  const myName=getMyName();
-  if(!myName){document.getElementById('myPostList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先设置昵称</div></div>';return;}
+  const myName=currentUser?currentUser.name:'';
+  if(!myName){document.getElementById('myPostList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先登录</div></div>';return;}
   const gs=allGames.filter(g=>g.creatorName===myName);
   const c=document.getElementById('myPostList');
   if(gs.length===0){c.innerHTML='<div class="empty"><div class="empty-icon">⚽</div><div>你还没发过球局</div></div>';return;}
@@ -349,8 +489,8 @@ async function renderMyPost(){
     <div class="card-meta"><div>🕐 ${g.time}　📍 ${escapeHtml(g.place)}</div><div>👥 ${ps.length}/${g.max}人报名</div></div></div>`;}).join('');
 }
 async function renderMyJoin(){
-  const myName=getMyName();
-  if(!myName){document.getElementById('myJoinList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先设置昵称</div></div>';return;}
+  const myName=currentUser?currentUser.name:'';
+  if(!myName){document.getElementById('myJoinList').innerHTML='<div class="empty"><div class="empty-icon">👤</div><div>请先登录</div></div>';return;}
   const gs=allGames.filter(g=>(g.players||[]).some(p=>p.name===myName));
   const c=document.getElementById('myJoinList');
   if(gs.length===0){c.innerHTML='<div class="empty"><div class="empty-icon">⚽</div><div>你还没报名任何球局</div></div>';return;}
@@ -365,9 +505,8 @@ function setDefaultDate(){
   document.getElementById('postDate').value=d;
   document.getElementById('postTime').value='10:00';
 }
-function ensureMyName(){let n=getMyName();if(!n){n=prompt('请输入你的昵称：')||'';if(n){saveMyName(n);}else{toast('需要昵称才能发球');return false;}}return true;}
 async function postGame(){
-  if(!ensureMyName())return;
+  if(!currentUser){toast('请先登录');return;}
   const btn=document.getElementById('postSubmitBtn');
   btn.disabled=true;btn.textContent='发布中...';
   const title=document.getElementById('postTitle').value.trim();
@@ -379,7 +518,7 @@ async function postGame(){
   const fee=document.getElementById('postFee').value;
   const note=document.getElementById('postNote').value.trim();
   if(!title||!date||!time||!place||!address){toast('请填写必填项');btn.disabled=false;btn.textContent='发布球局';return;}
-  const newGame={title,date,time,place,address,max,fee:fee||'免费',note,creatorName:getMyName(),createdDate:new Date().toISOString().split('T')[0],players:[]};
+  const newGame={title,date,time,place,address,max,fee:fee||'免费',note,creatorName:currentUser.name,creatorPhone:currentUser.phone,createdDate:new Date().toISOString().split('T')[0],players:[]};
   await addCloudGame(newGame);
   document.getElementById('postTitle').value='';document.getElementById('postPlace').value='';document.getElementById('postAddress').value='';document.getElementById('postNote').value='';
   btn.disabled=false;btn.textContent='发布球局';
@@ -389,21 +528,19 @@ async function postGame(){
 
 // ========== 报名 ==========
 function openJoinModal(id){
-  let name=getMyName();
-  if(!name){name=prompt('请输入你的昵称：')||'';if(!name){toast('需要昵称才能报名');return;}saveMyName(name);document.getElementById('headerUser').textContent='👤'+name;}
+  if(!currentUser){toast('请先登录');return;}
   pendingJoinId=id;
-  document.getElementById('joinName').value=name;
-  document.getElementById('joinPhone').value='';
+  document.getElementById('joinName').value=currentUser?currentUser.name:'';
+  document.getElementById('joinPhone').value=currentUser?currentUser.phone:'';
   document.getElementById('joinModal').classList.add('show');
   document.getElementById('joinName').focus();
 }
 function closeJoinModal(){document.getElementById('joinModal').classList.remove('show');pendingJoinId=null;}
 async function confirmJoin(){
-  const name=document.getElementById('joinName').value.trim();
-  const phone=document.getElementById('joinPhone').value.trim();
+  const name=currentUser?currentUser.name:document.getElementById('joinName').value.trim();
+  const phone=currentUser?currentUser.phone:'';
   if(!name){toast('请输入昵称');return;}
   if(!pendingJoinId)return;
-  saveMyName(name);
   const g=allGames.find(x=>getId(x)===pendingJoinId);
   if(!g){toast('球局不存在');return;}
   if(!g.players)g.players=[];
@@ -416,7 +553,7 @@ async function confirmJoin(){
   if(currentPage==='pageDetail')await renderDetail(pendingJoinId);
 }
 async function cancelJoin(id){
-  const myName=getMyName();if(!myName)return;
+  const myName=currentUser?currentUser.name:'';if(!myName)return;
   const g=allGames.find(x=>getId(x)===id);if(!g)return;
   g.players=(g.players||[]).filter(p=>p.name!==myName);
   await updateCloudGame(id,{players:g.players});
@@ -446,8 +583,7 @@ document.getElementById('filterBar').addEventListener('click',e=>{
 (function(){
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('postDate').min=today;
-  initCloudBase().then(()=>renderGameList());
-  const n=getMyName();if(n)document.getElementById('headerUser').textContent='👤'+escapeHtml(n);
+  initCloudBase();
 })();
 </script>
 </body>
