@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gradle-logs
-          path: ..gradle-build.log
+          path: gradle-build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
